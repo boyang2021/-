@@ -82,7 +82,7 @@ export interface AppState {
     exp: number;
     inspiration: number;
     save_dc: number;
-    stats: Record<StatKey, number>;
+    stats: Record<StatKey, number>; // This represents BASE stats
     skill_proficiencies: Record<string, boolean>;
     background: string;
   };
@@ -131,4 +131,6 @@ export type Action =
   | { type: 'DELETE_INVENTORY_ITEM'; id: string }
   | { type: 'ADD_SKILL'; skill: CooldownSkill }
   | { type: 'UPDATE_SKILL'; id: string, payload: Partial<CooldownSkill> }
-  | { type: 'DELETE_SKILL'; id: string };
+  | { type: 'DELETE_SKILL'; id: string }
+  | { type: 'UPDATE_CHARACTER_SPELL'; metadata: CharacterSpellMetadata }
+  | { type: 'ADD_SPELLS'; spells: Spell[] };

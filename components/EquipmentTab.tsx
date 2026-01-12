@@ -5,7 +5,13 @@ import { EMPTY_BONUS } from '../constants';
 interface Props {
   state: AppState;
   dispatch: React.Dispatch<Action>;
-  derived: any;
+  // Fix: Provide explicit type for derived stats instead of any to prevent "unknown" type inference errors
+  derived: {
+    totalStats: Record<StatKey, number>;
+    hpMax: number;
+    saveDc: number;
+    pb: number;
+  };
 }
 
 const EquipmentTab: React.FC<Props> = ({ state, dispatch, derived }) => {
@@ -95,7 +101,8 @@ const EquipmentTab: React.FC<Props> = ({ state, dispatch, derived }) => {
                   <button onClick={() => setEditingItem(item)} className="material-icons text-xs text-slate-500 hover:text-white">edit</button>
                 </div>
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {Object.entries(item.statBonus).map(([s, v]) => v !== 0 && <span key={s} className="text-[9px] font-black text-amber-500 uppercase">{s} {v > 0 ? '+' : ''}{v}</span>)}
+                  {/* Fix: Explicitly cast 'v' to number to avoid 'unknown' comparison error */}
+                  {Object.entries(item.statBonus).map(([s, v]) => (v as number) !== 0 && <span key={s} className="text-[9px] font-black text-amber-500 uppercase">{s} {(v as number) > 0 ? '+' : ''}{v as number}</span>)}
                 </div>
                 <div className="text-[9px] text-slate-500 italic">拖拽上身进行装备</div>
               </div>
@@ -108,9 +115,9 @@ const EquipmentTab: React.FC<Props> = ({ state, dispatch, derived }) => {
           <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-6">数值最终汇总 (含装备)</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
             {(Object.keys(state.character.stats) as StatKey[]).map(s => {
-              // Fix: Extract values and cast to number to ensure safe comparison and resolve 'unknown' operator error
-              const baseValue = state.character.stats[s] as number;
-              const totalValue = (derived.totalStats[s] as number) || 0;
+              // Fix: Explicitly cast to number and ensure types are resolved before numeric comparison to avoid "unknown" operator errors
+              const baseValue: number = state.character.stats[s];
+              const totalValue: number = derived.totalStats[s] || 0;
               
               return (
                 <div key={s}>

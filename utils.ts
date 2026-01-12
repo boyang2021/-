@@ -4,10 +4,13 @@ import { AppState, StatKey, Modifier, EquipmentItem } from './types';
 // Formula: adjust = trunc(((N / 5) - 10) / 2)
 export const getAbilityMod = (val: number) => Math.trunc(((val / 5) - 10) / 2);
 
-export const getProficiencyBonus = (level: number) => 2 + Math.floor((level - 1) / 4);
+// New requested algorithm: proficiencyBonus = trunc(Level / 5)
+export const getProficiencyBonus = (level: number) => Math.trunc(level / 5);
 
 export const getDerivedStats = (state: AppState) => {
-  const totalStats = { ...state.character.stats };
+  const baseStats = { ...state.character.stats };
+  const equipmentBonus: Record<StatKey, number> = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 };
+  
   let hpMaxBonus = 0;
   let saveDcBonus = 0;
 
@@ -16,7 +19,7 @@ export const getDerivedStats = (state: AppState) => {
     if (item) {
       // Direct Stat Bonuses
       (Object.keys(item.statBonus) as StatKey[]).forEach(s => {
-        totalStats[s] += item.statBonus[s];
+        equipmentBonus[s] += item.statBonus[s];
       });
       // Other Modifiers
       item.otherModifiers.forEach(m => {
@@ -26,9 +29,16 @@ export const getDerivedStats = (state: AppState) => {
     }
   });
 
+  const totalStats: Record<StatKey, number> = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 };
+  (Object.keys(baseStats) as StatKey[]).forEach(s => {
+    totalStats[s] = baseStats[s] + (equipmentBonus[s] || 0);
+  });
+
   const pb = getProficiencyBonus(state.character.level);
 
   return {
+    baseStats,
+    equipmentBonus,
     totalStats,
     hpMax: state.combat.hp_max + hpMaxBonus,
     saveDc: state.character.save_dc + saveDcBonus,
