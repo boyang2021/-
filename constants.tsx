@@ -85,7 +85,15 @@ export const SEED_DATA: AppState = {
       { "id": "feat_1", "name": "炼金狂热", "description": "使用药剂时效果翻倍。", "pinned": true }
     ],
     "cooldown_skills": [
-      { "id": "skill_1", "name": "毒云喷射", "base_cd": 3, "current_cd": 0, "description": "制造一片持续3回合的毒云。" }
+      { 
+        "id": "skill_1", 
+        "name": "毒云喷射", 
+        "base_cd": 3, 
+        "current_cd": 0, 
+        "description": "制造一片持续3回合的毒云。", 
+        "source": "system",
+        "isArchived": false 
+      }
     ],
     "turn_count": 1
   }

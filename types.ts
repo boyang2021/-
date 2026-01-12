@@ -69,6 +69,8 @@ export interface CooldownSkill {
   base_cd: number;
   current_cd: number;
   description: string;
+  source: 'system' | 'custom';
+  isArchived?: boolean;
 }
 
 export interface AppState {
@@ -82,7 +84,7 @@ export interface AppState {
     exp: number;
     inspiration: number;
     save_dc: number;
-    stats: Record<StatKey, number>; // This represents BASE stats
+    stats: Record<StatKey, number>;
     skill_proficiencies: Record<string, boolean>;
     background: string;
   };
@@ -139,5 +141,6 @@ export type Action =
   | { type: 'ADD_SKILL'; skill: CooldownSkill }
   | { type: 'UPDATE_SKILL'; id: string, payload: Partial<CooldownSkill> }
   | { type: 'DELETE_SKILL'; id: string }
+  | { type: 'ARCHIVE_SKILL'; id: string; archived: boolean }
   | { type: 'UPDATE_CHARACTER_SPELL'; metadata: CharacterSpellMetadata }
   | { type: 'ADD_SPELLS'; spells: Spell[] };
