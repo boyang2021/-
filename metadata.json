@@ -1,0 +1,5 @@
+{
+  "name": "DND Player Companion",
+  "description": "An offline-first DND companion for character tracking, equipment management, spellbook library, and combat HUD with cooldowns and conditions.",
+  "requestFramePermissions": []
+}
