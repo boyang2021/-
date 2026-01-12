@@ -1,6 +1,6 @@
 
 import React, { useReducer, useEffect, useState, useMemo } from 'react';
-import { AppState, Action, Spell, CharacterSpellMetadata, EquipmentItem, InventoryItem, Condition, CooldownSkill } from './types';
+import { AppState, Action, Archive, InventoryItem } from './types';
 import { SEED_DATA } from './constants';
 import { getDerivedStats, exportToJson } from './utils';
 
@@ -10,12 +10,29 @@ import EquipmentTab from './components/EquipmentTab';
 import SpellsTab from './components/SpellsTab';
 import CombatTab from './components/CombatTab';
 
-const LOCAL_STORAGE_KEY = 'DND_COMPANION_STATE_V1_4';
+const ARCHIVES_KEY = 'DND_COMPANION_ARCHIVES_V2';
+const ACTIVE_ARCHIVE_ID_KEY = 'DND_COMPANION_ACTIVE_ID_V2';
 
-const initialState: AppState & { history?: AppState } = (() => {
-  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-  return saved ? JSON.parse(saved) : SEED_DATA;
-})();
+// Helper to get initial state from multi-save storage
+const getInitialSaves = (): Record<string, Archive> => {
+  const saved = localStorage.getItem(ARCHIVES_KEY);
+  if (saved) return JSON.parse(saved);
+  const defaultId = 'default-save';
+  return {
+    [defaultId]: {
+      id: defaultId,
+      name: '初始存档',
+      lastUpdated: Date.now(),
+      state: SEED_DATA
+    }
+  };
+};
+
+const getInitialActiveId = (saves: Record<string, Archive>): string => {
+  const savedId = localStorage.getItem(ACTIVE_ARCHIVE_ID_KEY);
+  if (savedId && saves[savedId]) return savedId;
+  return Object.keys(saves)[0];
+};
 
 function reducer(state: AppState & { history?: AppState }, action: Action): AppState & { history?: AppState } {
   const riskyActions = ['UPDATE_COMBAT', 'END_TURN', 'CAST_SKILL', 'EQUIP_ITEM', 'UNEQUIP_ITEM', 'RESET_SKILLS'];
@@ -101,11 +118,73 @@ function reducer(state: AppState & { history?: AppState }, action: Action): AppS
 }
 
 const App: React.FC = () => {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  // Archive Management State
+  const [archives, setArchives] = useState<Record<string, Archive>>(getInitialSaves());
+  const [activeId, setActiveId] = useState<string>(getInitialActiveId(archives));
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [newArchiveName, setNewArchiveName] = useState('');
+
+  // App Core State
+  const [state, dispatch] = useReducer(reducer, archives[activeId]?.state || SEED_DATA);
   const [activeTab, setActiveTab] = useState<'character' | 'equipment' | 'spells' | 'combat'>('character');
 
-  useEffect(() => { localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state)); }, [state]);
+  // Derived Stats
   const derived = useMemo(() => getDerivedStats(state), [state]);
+
+  // Real-time Auto-save to current active ID
+  useEffect(() => {
+    const updatedArchives = {
+      ...archives,
+      [activeId]: {
+        ...archives[activeId],
+        lastUpdated: Date.now(),
+        state: state
+      }
+    };
+    setArchives(updatedArchives);
+    localStorage.setItem(ARCHIVES_KEY, JSON.stringify(updatedArchives));
+    localStorage.setItem(ACTIVE_ARCHIVE_ID_KEY, activeId);
+  }, [state, activeId]);
+
+  // Archive Actions
+  const createSnapshot = () => {
+    const name = newArchiveName.trim() || `${state.character.name} (等级 ${state.character.level})`;
+    const id = `save-${Date.now()}`;
+    const newArchive: Archive = {
+      id,
+      name,
+      lastUpdated: Date.now(),
+      state: JSON.parse(JSON.stringify(state))
+    };
+    const updated = { ...archives, [id]: newArchive };
+    setArchives(updated);
+    setActiveId(id);
+    setNewArchiveName('');
+    alert(`快照 "${name}" 已保存！`);
+  };
+
+  const loadArchive = (id: string) => {
+    setActiveId(id);
+    dispatch({ type: 'SET_STATE', payload: archives[id].state });
+    setIsArchiveModalOpen(false);
+  };
+
+  const deleteArchive = (id: string) => {
+    if (Object.keys(archives).length <= 1) {
+      alert("至少需要保留一个存档。");
+      return;
+    }
+    if (confirm("确定要删除此存档吗？此操作无法撤销。")) {
+      const updated = { ...archives };
+      delete updated[id];
+      setArchives(updated);
+      if (id === activeId) {
+        const nextId = Object.keys(updated)[0];
+        setActiveId(nextId);
+        dispatch({ type: 'SET_STATE', payload: updated[nextId].state });
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 font-sans selection:bg-amber-500/30 text-slate-100 overflow-x-hidden">
@@ -133,18 +212,106 @@ const App: React.FC = () => {
             </div>
             <div className="w-px h-8 bg-white/5"></div>
             <div className="flex flex-col items-center">
-              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Inspiration</span>
-              <span className="text-lg font-black text-blue-400">{state.combat.inspiration}</span>
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Active Save</span>
+              <span className="text-[10px] font-black text-blue-400 max-w-[100px] truncate">{archives[activeId]?.name}</span>
             </div>
           </div>
-          <button onClick={() => exportToJson(state, `dnd-${state.character.name}`)} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-2xl transition border border-white/5">
-            <span className="material-icons text-slate-400">save</span>
+
+          {/* Archive Management Button */}
+          <button 
+            onClick={() => setIsArchiveModalOpen(true)}
+            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 px-5 py-3 rounded-2xl transition border border-white/5 group"
+          >
+            <span className="material-icons text-amber-500 group-hover:rotate-12 transition-transform">auto_stories</span>
+            <span className="text-[10px] font-black uppercase tracking-widest hidden lg:inline">存档管理</span>
           </button>
-          <button onClick={() => confirm("Reset all data?") && dispatch({ type: 'SET_STATE', payload: SEED_DATA })} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 p-3 rounded-2xl transition border border-rose-500/10">
-            <span className="material-icons">refresh</span>
+
+          <button onClick={() => exportToJson(state, `dnd-${state.character.name}`)} className="bg-slate-800 hover:bg-slate-700 p-3 rounded-2xl transition border border-white/5" title="导出 JSON">
+            <span className="material-icons text-slate-400">download</span>
           </button>
         </div>
       </header>
+
+      {/* Archive Modal (Glassmorphism) */}
+      {isArchiveModalOpen && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 lg:p-12">
+          <div className="bg-slate-900/60 border border-white/10 rounded-[3rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-scale-in">
+            <div className="p-10 border-b border-white/5 flex justify-between items-center">
+              <div>
+                <h2 className="text-3xl font-black text-white tracking-tighter uppercase">英雄编年史</h2>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-2">Archive Management & Snapshots</p>
+              </div>
+              <button onClick={() => setIsArchiveModalOpen(false)} className="material-icons text-slate-600 hover:text-white transition-colors">close</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-10 space-y-8 no-scrollbar">
+              {/* New Snapshot Input */}
+              <div className="bg-slate-950/50 p-8 rounded-[2rem] border border-amber-500/20">
+                <h3 className="text-[11px] font-black text-amber-500 uppercase tracking-widest mb-4">创建新快照 (Create Snapshot)</h3>
+                <div className="flex gap-4">
+                  <input 
+                    type="text" 
+                    placeholder="为你的快照命名..." 
+                    value={newArchiveName}
+                    onChange={e => setNewArchiveName(e.target.value)}
+                    className="flex-1 bg-slate-900 border border-white/5 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:border-amber-500 transition-all text-white"
+                  />
+                  <button 
+                    onClick={createSnapshot}
+                    className="bg-amber-500 text-slate-950 px-8 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                  >
+                    保存快照
+                  </button>
+                </div>
+              </div>
+
+              {/* Archive List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Fix: Added explicit cast to Archive[] to ensure proper type inference and prevent 'unknown' property errors */}
+                {(Object.values(archives) as Archive[]).sort((a, b) => b.lastUpdated - a.lastUpdated).map(arc => (
+                  <div 
+                    key={arc.id}
+                    className={`p-8 rounded-[2.5rem] border-2 transition-all group relative overflow-hidden ${activeId === arc.id ? 'bg-amber-500/5 border-amber-500 shadow-2xl' : 'bg-slate-950/30 border-white/5 hover:border-slate-700'}`}
+                  >
+                    {activeId === arc.id && (
+                      <div className="absolute top-0 right-0 bg-amber-500 text-slate-950 px-4 py-1 text-[8px] font-black uppercase tracking-widest rounded-bl-xl">
+                        ACTIVE
+                      </div>
+                    )}
+                    <div className="space-y-2 mb-8">
+                      <h4 className={`text-xl font-black tracking-tight ${activeId === arc.id ? 'text-amber-500' : 'text-white'}`}>{arc.name}</h4>
+                      <div className="flex items-center gap-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                        <span>{arc.state.character.race} · {arc.state.character.class}</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-800"></span>
+                        <span>Level {arc.state.character.level}</span>
+                      </div>
+                      <p className="text-[9px] text-slate-700 font-bold">最后更新: {new Date(arc.lastUpdated).toLocaleString()}</p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      {activeId !== arc.id && (
+                        <button 
+                          onClick={() => loadArchive(arc.id)}
+                          className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
+                        >
+                          加载存档
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => deleteArchive(arc.id)}
+                        className="p-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl transition-all"
+                        title="删除存档"
+                      >
+                        <span className="material-icons text-sm">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Navigation */}
       <nav className="bg-slate-900/40 border-b border-white/5 sticky top-[108px] z-50 backdrop-blur-md">
@@ -213,6 +380,12 @@ const App: React.FC = () => {
           100% { transform: scale(1); opacity: 1; }
         }
         .animate-bounce-in { animation: bounce-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+        @keyframes scale-in {
+          from { transform: scale(0.9); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .animate-scale-in { animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
         
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

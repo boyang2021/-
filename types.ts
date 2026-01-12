@@ -115,6 +115,13 @@ export interface AppState {
   };
 }
 
+export interface Archive {
+  id: string;
+  name: string;
+  lastUpdated: number;
+  state: AppState;
+}
+
 export type Action = 
   | { type: 'SET_STATE'; payload: AppState }
   | { type: 'UPDATE_CHARACTER'; payload: Partial<AppState['character']> }
