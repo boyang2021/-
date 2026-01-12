@@ -29,44 +29,44 @@ const DiceRoller: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="bg-slate-800 p-4 text-white flex justify-between items-center">
-        <h2 className="text-lg font-bold flex items-center">
-          <span className="material-icons mr-2 text-amber-400">casino</span> 投掷骰子
+    <div className="bg-slate-900 rounded-[2rem] shadow-2xl border border-white/5 overflow-hidden">
+      <div className="bg-slate-950 p-6 flex justify-between items-center border-b border-white/5">
+        <h2 className="text-sm font-black uppercase tracking-[0.2em] flex items-center text-slate-100">
+          <span className="material-icons mr-3 text-amber-500">casino</span> 投掷骰子
         </h2>
         <button 
           onClick={rollDice}
-          className="bg-amber-500 hover:bg-amber-400 text-slate-900 px-3 py-1 rounded-md text-sm font-bold transition"
+          className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition shadow-lg shadow-amber-500/10 active:scale-95"
         >
           全部投掷
         </button>
       </div>
-      <div className="p-4">
-        <div className="grid grid-cols-4 gap-2 mb-4">
+      <div className="p-8">
+        <div className="grid grid-cols-4 md:grid-cols-7 gap-4 mb-8">
           {DICE_TYPES.map(d => (
-            <div key={d} className="flex flex-col items-center">
-              <span className="text-[10px] font-bold text-slate-400 mb-1">D{d}</span>
+            <div key={d} className="flex flex-col items-center bg-slate-950/50 p-3 rounded-2xl border border-white/5">
+              <span className="text-[10px] font-black text-slate-600 mb-2 uppercase tracking-tighter">D{d}</span>
               <input 
                 type="number"
                 value={quantities[d]}
                 onChange={e => updateQty(d, parseInt(e.target.value) || 0)}
-                className="w-10 text-center text-xs border rounded p-1"
+                className="w-full bg-slate-950 text-center text-sm font-black text-slate-200 outline-none focus:text-amber-500 border border-transparent focus:border-amber-500/30 rounded-lg p-1 transition-all"
               />
             </div>
           ))}
         </div>
 
         {results.length > 0 && (
-          <div className="bg-slate-50 rounded-lg p-3 border border-dashed border-slate-300">
-            <div className="text-xs font-bold text-slate-500 mb-2 uppercase flex justify-between">
-              <span>结果</span>
-              <span className="text-amber-600">总和: {total}</span>
+          <div className="bg-slate-950 rounded-3xl p-6 border border-dashed border-white/10 animate-fade-in">
+            <div className="text-[10px] font-black text-slate-500 mb-4 uppercase tracking-[0.2em] flex justify-between items-center">
+              <span>ROLL RESULTS</span>
+              <span className="text-amber-500 text-lg">TOTAL: {total}</span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               {results.map((r, i) => (
-                <div key={i} className="bg-white px-2 py-1 rounded border border-slate-200 text-xs shadow-sm">
-                  <span className="text-slate-400 mr-1">D{r.die}:</span>
-                  <span className="font-bold text-slate-700">{r.roll}</span>
+                <div key={i} className="bg-slate-900 px-4 py-2 rounded-xl border border-white/5 text-xs shadow-inner flex items-baseline gap-2 group hover:border-amber-500/30 transition-all">
+                  <span className="text-slate-600 text-[9px] font-black uppercase">D{r.die}</span>
+                  <span className="font-black text-slate-100 text-lg">{r.roll}</span>
                 </div>
               ))}
             </div>
