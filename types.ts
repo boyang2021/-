@@ -57,10 +57,7 @@ export interface Condition {
 export interface CombatFeature {
   id: string;
   name: string;
-  uses_current?: number;
-  uses_max?: number;
   description: string;
-  pinned: boolean;
 }
 
 export interface CooldownSkill {
@@ -69,6 +66,7 @@ export interface CooldownSkill {
   base_cd: number;
   current_cd: number;
   description: string;
+  damage?: string;
   source: 'system' | 'custom';
   isArchived?: boolean;
 }
@@ -143,4 +141,9 @@ export type Action =
   | { type: 'DELETE_SKILL'; id: string }
   | { type: 'ARCHIVE_SKILL'; id: string; archived: boolean }
   | { type: 'UPDATE_CHARACTER_SPELL'; metadata: CharacterSpellMetadata }
-  | { type: 'ADD_SPELLS'; spells: Spell[] };
+  | { type: 'ADD_SPELLS'; spells: Spell[] }
+  | { type: 'ADD_PASSIVE'; passive: CombatFeature }
+  | { type: 'UPDATE_PASSIVE'; id: string, payload: Partial<CombatFeature> }
+  | { type: 'DELETE_PASSIVE'; id: string }
+  | { type: 'DUPLICATE_PASSIVE'; id: string }
+  | { type: 'RESET_SKILLS_INTERNAL' };

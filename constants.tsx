@@ -41,7 +41,7 @@ export const STATUS_LIST = [
 export const EMPTY_BONUS = { STR: 0, DEX: 0, CON: 0, INT: 0, WIS: 0, CHA: 0 };
 
 export const SEED_DATA: AppState = {
-  "version": "1.2.0",
+  "version": "1.4.0",
   "character": {
     "id": "char_001",
     "name": "炼",
@@ -82,7 +82,16 @@ export const SEED_DATA: AppState = {
     "others": { "AC": 18, "Speed": "30ft" },
     "conditions": [{ "name": "触电", "stacks": 2, "rounds_left": 3 }],
     "features": [
-      { "id": "feat_1", "name": "炼金狂热", "description": "使用药剂时效果翻倍。", "pinned": true }
+      { 
+        "id": "feat_1", 
+        "name": "炼金狂热", 
+        "description": "使用药剂时效果翻倍。这包括生命药水、法力药水以及任何你亲手调制的炼金药剂。在计算治疗量或增益持续时间时，直接乘以 2。"
+      },
+      { 
+        "id": "feat_2", 
+        "name": "自然亲和", 
+        "description": "作为木精灵，你在森林地形中的隐匿判定获得优势。此外，你可以与小型植物进行基础的意识沟通，获取过去24小时内经过此地的生物信息。"
+      }
     ],
     "cooldown_skills": [
       { 
@@ -90,7 +99,8 @@ export const SEED_DATA: AppState = {
         "name": "毒云喷射", 
         "base_cd": 3, 
         "current_cd": 0, 
-        "description": "制造一片持续3回合的毒云。", 
+        "description": "制造一片持续3回合的毒云。区域内生物每回合开始需进行体质豁免，失败则受到 4d8 点毒性伤害并陷入中毒状态。", 
+        "damage": "4d8",
         "source": "system",
         "isArchived": false 
       }

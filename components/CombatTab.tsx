@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { AppState, Action, Condition, CooldownSkill, CombatFeature } from '../types';
+import { AppState, Action, CooldownSkill, CombatFeature } from '../types';
 import { STATUS_LIST } from '../constants';
+import { rollDiceExpression } from '../utils';
 
 interface Props {
   state: AppState;
@@ -9,6 +10,7 @@ interface Props {
   derived: any;
 }
 
+// 可视化生命条组件
 const CombatHealthBar: React.FC<{
   hp_max: number;
   hp_current: number;
@@ -114,11 +116,13 @@ const CombatHealthBar: React.FC<{
   );
 };
 
+// 武技卡片组件
 const SkillCard: React.FC<{
   skill: CooldownSkill;
   dispatch: React.Dispatch<Action>;
   onEdit: (s: CooldownSkill) => void;
-}> = ({ skill, dispatch, onEdit }) => {
+  onCast: (s: CooldownSkill) => void;
+}> = ({ skill, dispatch, onEdit, onCast }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -128,174 +132,367 @@ const SkillCard: React.FC<{
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpen]);
 
-  const handleDelete = () => {
-    if (skill.source === 'system') {
-      alert("系统固有技能无法彻底遗忘，请使用‘从栏位移除’。");
-      return;
-    }
-    if (confirm(`确定要铭除武技 [${skill.name}] 吗？此操作无法通过简单的回合结束找回。`)) {
-      dispatch({ type: 'DELETE_SKILL', id: skill.id });
-    }
-    setMenuOpen(false);
-  };
-
-  const handleArchive = () => {
-    dispatch({ type: 'ARCHIVE_SKILL', id: skill.id, archived: !skill.isArchived });
-    setMenuOpen(false);
-  };
-
   if (skill.isArchived) return null;
 
   return (
-    <div className={`p-10 rounded-[3rem] border-2 transition-all duration-500 group relative flex flex-col ${skill.current_cd === 0 ? 'bg-slate-950 border-amber-500/40 shadow-2xl' : 'bg-slate-950/30 border-white/5 opacity-40'}`}>
+    <div key={skill.id} className={`p-10 rounded-[3rem] border-2 transition-all duration-500 group relative flex flex-col animate-fade-in ${skill.current_cd === 0 ? 'bg-slate-950 border-amber-500/40 shadow-2xl' : 'bg-slate-950/30 border-white/5 opacity-40'}`}>
       <div className="flex justify-between mb-8 items-start">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="font-black text-xl text-white tracking-tighter">{skill.name}</span>
             {skill.source === 'system' && <span className="bg-white/10 text-white/40 px-2 py-0.5 rounded-md text-[7px] font-black uppercase">Core</span>}
           </div>
-          <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Base CD {skill.base_cd}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Base CD {skill.base_cd}</p>
+            {skill.damage && <span className="text-[10px] text-rose-500 font-black flex items-center gap-1"><span className="material-icons text-[12px]">casino</span> {skill.damage}</span>}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-           <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${skill.current_cd === 0 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-700'}`}>{skill.current_cd === 0 ? 'READY' : `${skill.current_cd} ROUNDS`}</span>
-           <div className="relative" ref={menuRef}>
-              <button onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
-                 <span className="material-icons text-slate-500 text-lg">more_vert</span>
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[50] animate-scale-in">
-                   <button onClick={() => { onEdit(skill); setMenuOpen(false); }} className="w-full text-left px-6 py-4 text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white flex items-center gap-3">
-                      <span className="material-icons text-sm">edit</span> 编辑详情
-                   </button>
-                   <button onClick={handleArchive} className="w-full text-left px-6 py-4 text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white flex items-center gap-3">
-                      <span className="material-icons text-sm">visibility_off</span> 从栏位移除
-                   </button>
-                   <div className="h-px bg-white/5" />
-                   <button onClick={handleDelete} className={`w-full text-left px-6 py-4 text-[10px] font-black flex items-center gap-3 transition-colors ${skill.source === 'custom' ? 'text-rose-500 hover:bg-rose-500 hover:text-white' : 'text-slate-700 cursor-not-allowed'}`}>
-                      <span className="material-icons text-sm">delete_forever</span> 彻底遗忘
-                   </button>
-                </div>
-              )}
-           </div>
+        <div ref={menuRef} className="relative">
+           <button onClick={() => setMenuOpen(!menuOpen)} className="material-icons text-slate-700 hover:text-white transition-colors">more_vert</button>
+           {menuOpen && (
+             <div className="absolute right-0 mt-4 w-48 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-20 py-2 animate-scale-in">
+                <button onClick={() => { onEdit(skill); setMenuOpen(false); }} className="w-full text-left px-6 py-3 text-[10px] font-black text-slate-400 hover:bg-white/5 hover:text-white uppercase tracking-widest">编辑详情</button>
+                <div className="h-px bg-white/5 mx-4 my-2"></div>
+                <button 
+                  onClick={() => { 
+                    dispatch({ type: 'DELETE_SKILL', id: skill.id }); 
+                    setMenuOpen(false); 
+                  }} 
+                  className="w-full text-left px-6 py-3 text-[10px] font-black text-rose-500 hover:bg-rose-500/10 uppercase tracking-widest"
+                >彻底遗忘武技</button>
+             </div>
+           )}
         </div>
       </div>
-      <div className="mb-10 flex-1"><p className="text-xs text-slate-500 leading-relaxed italic">{skill.description}</p></div>
-      <button disabled={skill.current_cd > 0} onClick={() => dispatch({type:'CAST_SKILL', id: skill.id})} className={`w-full py-6 rounded-2xl text-xs font-black uppercase tracking-[0.3em] transition-all ${skill.current_cd === 0 ? 'bg-amber-500 text-slate-950 hover:scale-[1.03] shadow-2xl' : 'bg-slate-900 text-slate-700 cursor-not-allowed'}`}>CAST ACTION</button>
+      <p className="text-sm text-slate-500 font-bold leading-relaxed mb-8 flex-1 line-clamp-3 italic">{skill.description}</p>
+      <button 
+        disabled={skill.current_cd > 0} 
+        onClick={() => onCast(skill)}
+        className={`w-full py-6 rounded-2xl text-xs font-black uppercase tracking-[0.3em] transition-all ${skill.current_cd === 0 ? 'bg-amber-500 text-slate-950 hover:scale-[1.03] shadow-2xl shadow-amber-500/20 active:scale-95' : 'bg-slate-900 text-slate-700 cursor-not-allowed'}`}
+      >
+        {skill.current_cd === 0 ? '发动武技' : `冷却中 (${skill.current_cd}R)`}
+      </button>
     </div>
   );
 };
 
+// 被动特性卡片组件
+const TraitCard: React.FC<{
+  trait: CombatFeature;
+  dispatch: React.Dispatch<Action>;
+  onEdit: (t: CombatFeature) => void;
+}> = ({ trait, dispatch, onEdit }) => {
+  return (
+    <div key={trait.id} className="group bg-slate-900 border border-white/5 p-8 rounded-[2.5rem] hover:border-amber-500/30 transition-all relative overflow-hidden flex flex-col h-full min-h-[220px] shadow-lg animate-fade-in">
+      <div className="flex justify-between items-start mb-6">
+        <h4 className="text-xl font-black text-white tracking-tight leading-tight">{trait.name}</h4>
+        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <button onClick={() => onEdit(trait)} className="material-icons text-slate-600 hover:text-amber-500 transition-colors">edit_note</button>
+          <button 
+            onClick={() => { 
+              dispatch({ type: 'DELETE_PASSIVE', id: trait.id }); 
+            }} 
+            className="material-icons text-slate-600 hover:text-rose-500 transition-colors"
+          >delete_forever</button>
+        </div>
+      </div>
+      <div className="relative flex-1">
+        <p className="text-xs text-slate-400 font-bold leading-relaxed line-clamp-6 whitespace-pre-wrap italic">
+          {trait.description}
+        </p>
+        <div className="absolute inset-0 bg-slate-900/90 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-4 z-10 pointer-events-none text-center">
+           <span className="material-icons text-amber-500 mb-2">auto_awesome</span>
+           <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">
+             点击右上角编辑或彻底删除
+           </span>
+        </div>
+      </div>
+      <div className="absolute bottom-0 left-0 h-1 w-0 group-hover:w-full bg-amber-500/40 transition-all duration-700 shadow-[0_0_20px_rgba(245,158,11,0.2)]"></div>
+    </div>
+  );
+};
+
+// 主战斗面板
 const CombatTab: React.FC<Props> = ({ state, dispatch, derived }) => {
   const { combat } = state;
-  const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
-  const [tempSkill, setTempSkill] = useState<CooldownSkill | null>(null);
+  const [editingSkill, setEditingSkill] = useState<CooldownSkill | null>(null);
+  const [editingTrait, setEditingTrait] = useState<CombatFeature | null>(null);
+  const [castResult, setCastResult] = useState<{ skillName: string, result: any } | null>(null);
 
-  const toggleStatus = (name: string, isStackable: boolean) => {
+  const STACKABLE_NAMES = ['触电', '狂暴', '燃烧', '冰冻'];
+
+  const handleStatusClick = (name: string, isStackable: boolean) => {
     const existing = combat.conditions.find(c => c.name === name);
-    if (existing) dispatch({ type: 'UPDATE_CONDITION', name, updates: isStackable ? { stacks: existing.stacks + 1 } : null });
-    else dispatch({ type: 'UPDATE_CONDITION', name, updates: { stacks: 1, rounds_left: 3 } });
+    if (existing) {
+      dispatch({ type: 'UPDATE_CONDITION', name, updates: isStackable ? { stacks: existing.stacks + 1 } : null });
+    } else {
+      dispatch({ type: 'UPDATE_CONDITION', name, updates: { stacks: 1, rounds_left: 3 } });
+    }
   };
 
-  const handleHealthUpdate = (updates: { hp_current?: number; hp_temp?: number }) => dispatch({ type: 'UPDATE_COMBAT', payload: updates });
+  const handleStatusContextMenu = (e: React.MouseEvent, name: string) => {
+    // 只有指定的四个状态支持右键减层
+    if (!STACKABLE_NAMES.includes(name)) return;
+    
+    e.preventDefault(); // 阻止浏览器菜单
+    const existing = combat.conditions.find(c => c.name === name);
+    if (!existing) return;
 
-  const openSkillEditor = (skill: CooldownSkill) => { setEditingSkillId(skill.id); setTempSkill({ ...skill }); };
+    if (existing.stacks > 1) {
+      dispatch({ type: 'UPDATE_CONDITION', name, updates: { stacks: existing.stacks - 1 } });
+    } else {
+      dispatch({ type: 'UPDATE_CONDITION', name, updates: null }); // 移除状态
+    }
+  };
 
-  const saveSkillEdit = () => { if (tempSkill) { dispatch({ type: 'UPDATE_SKILL', id: tempSkill.id, payload: tempSkill }); setEditingSkillId(null); setTempSkill(null); } };
+  const handleCast = (skill: CooldownSkill) => {
+    if (skill.current_cd > 0) return;
+    if (skill.damage) {
+      const result = rollDiceExpression(skill.damage);
+      if (result) setCastResult({ skillName: skill.name, result });
+    }
+    dispatch({ type: 'CAST_SKILL', id: skill.id });
+  };
 
   return (
-    <div className="flex flex-col gap-12">
-      <section className="bg-slate-900 rounded-[4rem] p-16 shadow-2xl border border-white/5 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-rose-500 via-rose-500/20 to-rose-500/0" />
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start relative z-10">
-          <div className="lg:col-span-8">
-            <CombatHealthBar hp_max={combat.hp_max} hp_current={combat.hp_current} hp_temp={combat.hp_temp} onUpdate={handleHealthUpdate} />
+    <div className="space-y-16 pb-20">
+      {/* 1. 生命与状态栏 */}
+      <section className="bg-slate-900 rounded-[3rem] p-12 border border-white/5 shadow-2xl overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/5 blur-[120px] -mr-48 -mt-48"></div>
+        <div className="flex justify-between items-center mb-12 relative z-10">
+          <div>
+            <h2 className="text-xs font-black text-slate-500 uppercase tracking-[0.4em]">战场战况实时监控</h2>
+            <div className="text-4xl font-black text-white mt-2 tracking-tighter">回合 {state.combat.turn_count}</div>
           </div>
-          <div className="lg:col-span-4 grid grid-cols-1 gap-12 border-l border-white/5 pl-16 py-4">
-            <div className="space-y-3"><span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Saving DC</span><div className="text-6xl font-black text-amber-500 tabular-nums tracking-tighter">{combat.save_dc}</div></div>
-            <div className="space-y-3"><span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block">Armor Class</span><div className="text-6xl font-black text-white tabular-nums tracking-tighter">{combat.others.AC || 10}</div></div>
+          <button onClick={() => dispatch({ type: 'END_TURN' })} className="bg-white text-slate-950 px-12 py-5 rounded-[2rem] text-sm font-black uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3">
+            <span className="material-icons text-xl">hourglass_empty</span>
+            结束回合
+          </button>
+        </div>
+        
+        <CombatHealthBar 
+          hp_max={derived.hpMax} 
+          hp_current={state.combat.hp_current} 
+          hp_temp={state.combat.hp_temp} 
+          onUpdate={updates => dispatch({ type: 'UPDATE_COMBAT', payload: updates })} 
+        />
+
+        <div className="mt-8 bg-slate-950/40 rounded-[2.5rem] border border-white/5 p-8 relative z-10">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+            {STATUS_LIST.map(st => {
+              const active = combat.conditions.find(c => c.name === st.name);
+              return (
+                <button 
+                  key={st.name} 
+                  onClick={() => handleStatusClick(st.name, st.stackable)}
+                  onContextMenu={(e) => handleStatusContextMenu(e, st.name)}
+                  title={STACKABLE_NAMES.includes(st.name) ? "左键: 增加 / 右键: 减少" : ""}
+                  className={`py-2 px-3 rounded-xl text-[10px] font-black text-center border transition-all truncate select-none ${active ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-lg' : 'bg-slate-900 border-white/5 text-slate-600 hover:border-slate-500 hover:text-slate-300'}`}
+                >
+                  {st.name}{active && active.stacks > 1 ? ` x${active.stacks}` : ''}
+                </button>
+              );
+            })}
           </div>
+          <div className="mt-4 px-2">
+            <p className="text-[9px] font-black text-slate-700 uppercase tracking-widest italic">
+              * 提示: 右键点击“触电、狂暴、燃烧、冰冻”可减少层数。
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-slate-950/60 p-8 rounded-[2.5rem] border border-white/5 mt-8 relative z-10">
+            <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-6">当前激活状态</h3>
+            <div className="flex flex-wrap gap-3">
+               {combat.conditions.map(c => (
+                 <div key={c.name} className="bg-slate-900 border border-white/5 pl-4 pr-2 py-2 rounded-xl flex items-center gap-3 group">
+                    <span className="text-sm font-black text-white">{c.name} {c.stacks > 1 ? `(x${c.stacks})` : ''}</span>
+                    <div className="w-px h-4 bg-white/5"></div>
+                    <span className="text-[10px] font-black text-amber-500">{c.rounds_left}R</span>
+                    <button onClick={() => dispatch({ type: 'UPDATE_CONDITION', name: c.name, updates: null })} className="material-icons text-slate-700 hover:text-rose-500 text-xs">close</button>
+                 </div>
+               ))}
+               {combat.conditions.length === 0 && <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest italic opacity-20">无活动状态</span>}
+            </div>
+         </div>
+      </section>
+
+      {/* 2. 武技冷却栏 */}
+      <section className="space-y-10">
+        <div className="flex justify-between items-end px-4">
+           <div>
+             <h2 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em] mb-4">武技秘传刻印</h2>
+             <p className="text-slate-400 font-bold text-sm">点击“发动武技”将自动掷出对应伤害骰</p>
+           </div>
+           <div className="flex gap-4">
+             <button onClick={() => dispatch({type:'RESET_SKILLS'})} className="bg-slate-900 text-slate-500 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/5">冷却重置</button>
+             <button 
+               onClick={() => setEditingSkill({ id: `skill_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name: '', base_cd: 1, current_cd: 0, description: '', damage: '1d8', source: 'custom', isArchived: false })}
+               className="bg-amber-500 text-slate-950 px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl shadow-amber-500/10 active:scale-95 transition-all"
+             >铭刻武技</button>
+           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+           {combat.cooldown_skills.map(s => (
+             <SkillCard key={s.id} skill={s} dispatch={dispatch} onEdit={setEditingSkill} onCast={handleCast} />
+           ))}
+           {combat.cooldown_skills.length === 0 && (
+             <div className="col-span-full py-24 text-center bg-slate-900/10 rounded-[4rem] border-2 border-dashed border-white/5 opacity-40">
+                <span className="material-icons text-slate-800 text-6xl mb-4">casino</span>
+                <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">武技库尚无刻印，点击上方铭刻你的战斗奥秘</p>
+             </div>
+           )}
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        <div className="lg:col-span-4 space-y-12">
-          <section className="space-y-6">
-            <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em] px-6">状态列表</h3>
-            <div className="bg-slate-900 rounded-[3rem] p-10 border border-white/5 shadow-2xl grid grid-cols-2 gap-4 max-h-[400px] overflow-y-auto no-scrollbar">
-              {STATUS_LIST.map(s => {
-                const active = combat.conditions.find(c => c.name === s.name);
-                return (
-                  <button key={s.name} onClick={() => toggleStatus(s.name, s.stackable)} className={`p-4 rounded-2xl text-[11px] font-black border transition-all ${active ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-xl' : 'bg-slate-950 border-white/5 text-slate-700 hover:border-slate-500'}`}>
-                    {s.name}{active && active.stacks > 1 && <span className="block text-[9px] mt-1 opacity-60">x{active.stacks}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-          <section className="space-y-6">
-            <h3 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em] px-6">常驻特性</h3>
-            <div className="bg-slate-900 rounded-[3rem] border border-white/5 p-10 shadow-2xl space-y-8">
-              {combat.features.map(f => (
-                <div key={f.id} className="group border-b border-white/5 pb-6 last:border-0 last:pb-0">
-                  <div className="flex items-center font-black text-slate-100 text-sm tracking-tight mb-2">{f.pinned && <span className="material-icons text-amber-500 text-xs mr-2">push_pin</span>}{f.name}</div>
-                  <p className="text-[11px] text-slate-500 leading-relaxed font-medium">{f.description}</p>
-                </div>
-              ))}
-            </div>
-          </section>
+      {/* 3. 被动特性栏 */}
+      <section className="space-y-10">
+        <div className="flex justify-between items-end px-4">
+           <div>
+             <h2 className="text-xs font-black text-slate-600 uppercase tracking-[0.4em] mb-4">神魂被动特性</h2>
+             <p className="text-slate-400 font-bold text-sm">长期生效的奥秘能力。点击删除将彻底消失。</p>
+           </div>
+           <button 
+             onClick={() => setEditingTrait({ id: `trait_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`, name: '', description: '' })}
+             className="bg-slate-800 text-amber-500 border border-amber-500/20 px-10 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500 hover:text-slate-950 transition-all shadow-xl"
+           >显化特性</button>
         </div>
 
-        <section className="lg:col-span-8 flex flex-col gap-12">
-          <div className="bg-slate-900 rounded-[4rem] p-12 shadow-2xl border border-white/5 flex flex-col flex-1">
-            <div className="flex justify-between items-center mb-12">
-              <h3 className="text-lg font-black uppercase tracking-[0.2em] flex items-center text-white"><span className="material-icons text-amber-500 mr-4">history_toggle_off</span>冷却武技</h3>
-              <div className="flex gap-4">
-                <button onClick={() => dispatch({type:'RESET_SKILLS'})} className="bg-slate-950 hover:bg-slate-800 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 border border-white/5">Reset CD</button>
-                <button onClick={() => dispatch({type:'ADD_SKILL', skill: {id:'sk_'+Date.now(), name:'新武技', base_cd:3, current_cd:0, description:'技能奥秘...', source: 'custom', isArchived: false}})} className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-2xl">铭刻技能</button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 flex-1">
-              {combat.cooldown_skills.filter(s => !s.isArchived).map(skill => (
-                <SkillCard key={skill.id} skill={skill} dispatch={dispatch} onEdit={openSkillEditor} />
-              ))}
-              {combat.cooldown_skills.every(s => s.isArchived) && (
-                <div className="col-span-full py-20 text-center border-2 border-dashed border-white/5 rounded-[3rem] opacity-20"><p className="text-xs font-black uppercase tracking-widest">目前无激活的武技栏位</p></div>
-              )}
-            </div>
-            <div className="mt-20 flex flex-col items-center">
-              <button onClick={() => dispatch({type:'END_TURN'})} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-24 py-8 rounded-[3rem] font-black text-2xl tracking-[0.5em] uppercase shadow-lg transition-all hover:-translate-y-2 active:scale-95 group">
-                <div className="flex items-center gap-4"><span className="material-icons text-3xl group-hover:rotate-180 transition-transform duration-700">hourglass_bottom</span>结束回合</div>
-              </button>
-            </div>
-          </div>
-        </section>
-      </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+           {combat.features.map(f => (
+             <TraitCard 
+               key={f.id} 
+               trait={f} 
+               dispatch={dispatch} 
+               onEdit={setEditingTrait} 
+             />
+           ))}
+           
+           {combat.features.length === 0 && (
+             <div className="col-span-full py-24 text-center bg-slate-900/10 rounded-[4rem] border-2 border-dashed border-white/5 opacity-40">
+                <span className="material-icons text-slate-800 text-6xl mb-4">auto_awesome</span>
+                <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.5em]">神魂之海风平浪静，点击上方显化新的特性</p>
+             </div>
+           )}
+        </div>
+      </section>
 
-      {editingSkillId && tempSkill && (
-        <div className="fixed inset-0 z-[200] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-8">
-          <div className="bg-slate-900 rounded-[3.5rem] p-14 w-full max-w-2xl shadow-2xl border border-white/10 animate-scale-in">
-            <h2 className="text-4xl font-black mb-12 flex justify-between items-center text-white tracking-tighter">武技铭刻<button onClick={() => { setEditingSkillId(null); setTempSkill(null); }} className="material-icons text-slate-600 hover:text-white transition-colors">close</button></h2>
-            <div className="space-y-10">
-              <div className="grid grid-cols-12 gap-10">
-                <div className="col-span-8 space-y-4">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">武技名称</label>
-                  <input value={tempSkill.name} onChange={e => setTempSkill({...tempSkill, name: e.target.value})} className="w-full bg-slate-950 border-2 border-white/5 p-6 rounded-2xl font-black text-xl outline-none focus:border-amber-500 text-white" />
-                </div>
-                <div className="col-span-4 space-y-4">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">基础 CD</label>
-                  <input type="number" min="0" max="7" value={tempSkill.base_cd} onChange={e => setTempSkill({...tempSkill, base_cd: Math.max(0, Math.min(7, parseInt(e.target.value) || 0))})} className="w-full bg-slate-950 border-2 border-white/5 p-6 rounded-2xl font-black outline-none focus:border-amber-500 text-amber-500 text-center text-2xl" />
-                </div>
+      {/* --- 弹窗与遮罩层 --- */}
+
+      {/* 伤害掷骰结果遮罩 */}
+      {castResult && (
+        <div className="fixed inset-0 z-[250] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-8" onClick={() => setCastResult(null)}>
+          <div className="bg-slate-900 border border-rose-500/30 text-white rounded-[3.5rem] p-12 shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-scale-in min-w-[450px]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-12">
+              <div>
+                <h3 className="text-[10px] font-black uppercase text-rose-500 tracking-[0.5em] mb-2">{castResult.skillName} 发动成功</h3>
+                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">奥秘律动: {castResult.result.expression}</p>
               </div>
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2">秘法描述</label>
-                <textarea value={tempSkill.description} onChange={e => setTempSkill({...tempSkill, description: e.target.value})} className="w-full h-40 bg-slate-950 border-2 border-white/5 p-8 rounded-[2rem] font-bold text-sm outline-none focus:border-amber-500 text-slate-400 resize-none leading-relaxed" />
-              </div>
+              <button onClick={() => setCastResult(null)} className="material-icons text-slate-600 hover:text-white transition-colors">close</button>
             </div>
-            <button onClick={saveSkillEdit} className="w-full bg-amber-500 text-slate-950 font-black py-6 rounded-[2rem] mt-14 shadow-2xl active:scale-95 transition-all uppercase tracking-widest text-lg">铭刻修改 (Save)</button>
+            
+            <div className="flex flex-col gap-12 text-center">
+              <div className="flex flex-wrap gap-4 justify-center">
+                {castResult.result.rolls.map((r: number, i: number) => (
+                  <div key={i} className="bg-slate-950 w-16 h-16 flex flex-col items-center justify-center rounded-[1.5rem] border border-white/5 shadow-inner">
+                    <span className="text-[8px] font-black text-slate-700 uppercase mb-1">ROLL</span>
+                    <span className="text-2xl font-black text-slate-200">{r}</span>
+                  </div>
+                ))}
+                {castResult.result.modifier !== 0 && (
+                   <div className="flex flex-col justify-center px-6 h-16 bg-rose-500/10 rounded-[1.5rem] border border-rose-500/20">
+                      <span className="text-[8px] font-black text-rose-500 uppercase mb-1">MOD</span>
+                      <span className="text-xl font-black text-rose-500">{castResult.result.modifier > 0 ? '+' : ''}{castResult.result.modifier}</span>
+                   </div>
+                )}
+              </div>
+              <div className="relative inline-block py-4">
+                 <div className="absolute inset-0 bg-rose-500/20 blur-[60px] rounded-full"></div>
+                 <span className="text-[11px] text-rose-500 font-black block mb-4 tracking-[0.4em] uppercase relative z-10">Total Damage Dealt</span>
+                 <div className="relative z-10 flex items-center justify-center gap-4">
+                    <span className="material-icons text-rose-500 text-4xl animate-pulse">flash_on</span>
+                    <span className="text-9xl font-black text-white tracking-tighter tabular-nums drop-shadow-2xl">{castResult.result.total}</span>
+                    <span className="material-icons text-rose-500 text-4xl animate-pulse">flash_on</span>
+                 </div>
+              </div>
+              <button onClick={() => setCastResult(null)} className="w-full py-6 bg-slate-800 hover:bg-slate-700 rounded-3xl text-[11px] font-black uppercase tracking-[0.4em] text-slate-400 transition-all border border-white/5 mt-4">收回气劲</button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* 编辑武技弹窗 */}
+      {editingSkill && (
+        <div className="fixed inset-0 z-[200] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-8">
+           <div className="bg-slate-900 rounded-[3.5rem] p-14 w-full max-w-2xl border border-white/10 animate-scale-in shadow-2xl">
+              <h2 className="text-4xl font-black mb-12 text-white tracking-tighter">武技刻印仪轨</h2>
+              <div className="space-y-10">
+                 <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 ml-2">武技全称</label>
+                    <input value={editingSkill.name} onChange={e => setEditingSkill({...editingSkill, name: e.target.value})} className="w-full bg-slate-950 border-2 border-white/5 p-6 rounded-2xl font-black text-white text-xl outline-none focus:border-amber-500" />
+                 </div>
+                 <div className="grid grid-cols-2 gap-8">
+                    <div>
+                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 ml-2">冷却回合 (CD)</label>
+                       <input type="number" min="0" max="10" value={editingSkill.base_cd} onChange={e => setEditingSkill({...editingSkill, base_cd: parseInt(e.target.value) || 0})} className="w-full bg-slate-950 border-2 border-white/5 p-6 rounded-2xl font-black text-amber-500 text-center text-2xl outline-none focus:border-amber-500" />
+                    </div>
+                    <div>
+                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 ml-2">伤害骰 (如 1d8+2)</label>
+                       <input value={editingSkill.damage || ''} onChange={e => setEditingSkill({...editingSkill, damage: e.target.value})} className="w-full bg-slate-950 border-2 border-white/5 p-6 rounded-2xl font-black text-rose-500 text-center text-2xl outline-none focus:border-rose-500" placeholder="e.g. 1d8+2" />
+                    </div>
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 ml-2">效果详述</label>
+                    <textarea value={editingSkill.description} onChange={e => setEditingSkill({...editingSkill, description: e.target.value})} className="w-full h-32 bg-slate-950 border-2 border-white/5 p-8 rounded-[2rem] font-bold text-slate-400 outline-none focus:border-amber-500 resize-none leading-relaxed" />
+                 </div>
+              </div>
+              <div className="flex gap-4 mt-16">
+                 <button onClick={() => setEditingSkill(null)} className="flex-1 bg-slate-800 text-white font-black py-6 rounded-2xl uppercase tracking-widest text-xs">取消</button>
+                 <button onClick={() => {
+                   if (!combat.cooldown_skills.find(s => s.id === editingSkill.id)) {
+                     dispatch({ type: 'ADD_SKILL', skill: editingSkill });
+                   } else {
+                     dispatch({ type: 'UPDATE_SKILL', id: editingSkill.id, payload: editingSkill });
+                   }
+                   setEditingSkill(null);
+                 }} className="flex-1 bg-amber-500 text-slate-950 font-black py-6 rounded-2xl uppercase tracking-widest text-xs">完成刻印</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* 编辑特性弹窗 */}
+      {editingTrait && (
+        <div className="fixed inset-0 z-[200] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-8">
+           <div className="bg-slate-900 rounded-[3.5rem] p-14 w-full max-w-2xl border border-white/10 animate-scale-in shadow-2xl">
+              <h2 className="text-4xl font-black mb-12 text-white tracking-tighter">特性刻印仪轨</h2>
+              <div className="space-y-10">
+                 <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 ml-2">特性全称</label>
+                    <input value={editingTrait.name} onChange={e => setEditingTrait({...editingTrait, name: e.target.value})} className="w-full bg-slate-950 border-2 border-white/5 p-6 rounded-2xl font-black text-white text-xl outline-none focus:border-amber-500" />
+                 </div>
+                 <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-4 ml-2">效果详述</label>
+                    <textarea value={editingTrait.description} onChange={e => setEditingTrait({...editingTrait, description: e.target.value})} className="w-full h-64 bg-slate-950 border-2 border-white/5 p-8 rounded-[2rem] font-bold text-slate-400 outline-none focus:border-amber-500 resize-none leading-relaxed" />
+                 </div>
+              </div>
+              <div className="flex gap-4 mt-16">
+                 <button onClick={() => setEditingTrait(null)} className="flex-1 bg-slate-800 text-white font-black py-6 rounded-2xl uppercase tracking-widest text-xs">取消</button>
+                 <button onClick={() => {
+                   if (!combat.features.find(f => f.id === editingTrait.id)) {
+                     dispatch({ type: 'ADD_PASSIVE', passive: editingTrait });
+                   } else {
+                     dispatch({ type: 'UPDATE_PASSIVE', id: editingTrait.id, payload: editingTrait });
+                   }
+                   setEditingTrait(null);
+                 }} className="flex-1 bg-amber-500 text-slate-950 font-black py-6 rounded-2xl uppercase tracking-widest text-xs">完成刻印</button>
+              </div>
+           </div>
         </div>
       )}
     </div>
   );
 };
+
 export default CombatTab;

@@ -1,10 +1,7 @@
 
 import { AppState, StatKey, Modifier, EquipmentItem } from './types';
 
-// Formula: adjust = trunc(((N / 5) - 10) / 2)
 export const getAbilityMod = (val: number) => Math.trunc(((val / 5) - 10) / 2);
-
-// New requested algorithm: proficiencyBonus = trunc(Level / 5)
 export const getProficiencyBonus = (level: number) => Math.trunc(level / 5);
 
 export const getDerivedStats = (state: AppState) => {
@@ -14,14 +11,11 @@ export const getDerivedStats = (state: AppState) => {
   let hpMaxBonus = 0;
   let saveDcBonus = 0;
 
-  // Aggregate bonuses from all slots
   Object.values(state.equipment.slots).forEach((item: EquipmentItem | null) => {
     if (item) {
-      // Direct Stat Bonuses
       (Object.keys(item.statBonus) as StatKey[]).forEach(s => {
         equipmentBonus[s] += item.statBonus[s];
       });
-      // Other Modifiers
       item.otherModifiers.forEach(m => {
         if (m.kind === 'hp') hpMaxBonus += m.value;
         if (m.kind === 'save_dc') saveDcBonus += m.value;
@@ -42,6 +36,7 @@ export const getDerivedStats = (state: AppState) => {
     totalStats,
     hpMax: state.combat.hp_max + hpMaxBonus,
     saveDc: state.character.save_dc + saveDcBonus,
+    ac: state.combat.others.AC || 10,
     pb
   };
 };
@@ -54,4 +49,21 @@ export const exportToJson = (data: any, fileName: string) => {
   link.download = `${fileName}.json`;
   link.click();
   URL.revokeObjectURL(url);
+};
+
+export const rollDiceExpression = (expression: string) => {
+  const cleanExpr = expression.toLowerCase().replace(/\s/g, '');
+  const regex = /^(\d+)d(\d+)([+-]\d+)?$/;
+  const match = cleanExpr.match(regex);
+  if (!match) return null;
+  const count = parseInt(match[1]);
+  const sides = parseInt(match[2]);
+  const modifier = match[3] ? parseInt(match[3]) : 0;
+  const rolls: number[] = [];
+  for (let i = 0; i < count; i++) {
+    rolls.push(Math.floor(Math.random() * sides) + 1);
+  }
+  const diceTotal = rolls.reduce((acc, r) => acc + r, 0);
+  const total = diceTotal + modifier;
+  return { expression, rolls, modifier, total };
 };
