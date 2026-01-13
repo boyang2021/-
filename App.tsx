@@ -33,7 +33,8 @@ const getInitialActiveId = (saves: Record<string, Archive>): string => {
   return Object.keys(saves)[0];
 };
 
-function reducer(state: AppState & { history?: AppState }, action: Action): AppState & { history?: AppState } {
+// Simplified reducer to use AppState directly as it now includes the optional history property
+function reducer(state: AppState, action: Action): AppState {
   const riskyActions = [
     'UPDATE_COMBAT', 'END_TURN', 'CAST_SKILL', 'EQUIP_ITEM', 
     'UNEQUIP_ITEM', 'RESET_SKILLS', 'DELETE_SKILL', 'ADD_SKILL', 'UPDATE_SKILL', 'ARCHIVE_SKILL',
@@ -42,8 +43,9 @@ function reducer(state: AppState & { history?: AppState }, action: Action): AppS
   
   let nextState = { ...state };
   if (riskyActions.includes(action.type)) {
+    // Destructuring correctly removes existing history from pureState to prevent recursive histories
     const { history, ...pureState } = state;
-    nextState.history = pureState;
+    nextState.history = pureState as AppState;
   }
 
   switch (action.type) {
@@ -231,6 +233,7 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      {/* history property is now native to state from AppState */}
       {state.history && (
         <button onClick={() => dispatch({ type: 'UNDO' })} className="fixed bottom-12 left-12 bg-slate-800 text-amber-500 w-16 h-16 rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[70] border border-white/10 group" title="时间溯行 (Undo)">
           <span className="material-icons text-3xl group-hover:rotate-[-90deg] transition-transform duration-500">history</span>

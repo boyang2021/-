@@ -73,6 +73,8 @@ export interface CooldownSkill {
 
 export interface AppState {
   version: string;
+  // Added history to support undo functionality within the serializable state
+  history?: AppState;
   character: {
     id: string;
     name: string;

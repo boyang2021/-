@@ -45,7 +45,8 @@ const CharacterTab: React.FC<Props> = ({ state, dispatch, derived }) => {
   };
 
   const toggleSavingThrowProficiency = (s: StatKey) => {
-    const currentProfs = character.saving_throw_proficiencies || {};
+    // Removed redundant `|| {}` which stripped mandatory StatKey properties from the record type
+    const currentProfs = character.saving_throw_proficiencies;
     dispatch({
       type: 'UPDATE_CHARACTER',
       payload: {
