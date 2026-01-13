@@ -2,27 +2,33 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
+// 判断是否是开发环境
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
-    backgroundColor: '#020617', // 匹配项目的 slate-950 背景色
+    backgroundColor: '#020617',
     title: "DND Player Companion",
-    icon: path.join(__dirname, 'icon.ico'), // 如果有图标可以放置在此
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
+      nodeIntegration: false, // 安全最佳实践：关闭
+      contextIsolation: true, // 安全最佳实践：开启
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
-  // 隐藏原生菜单栏，提升沉浸感
   win.setMenuBarVisibility(false);
 
-  // 加载项目入口
-  win.loadFile('index.html');
-
-  // 开发时可以开启调试工具
-  // win.webContents.openDevTools();
+  if (isDev) {
+    // 开发环境：加载 Vite dev server
+    win.loadURL('http://localhost:5173');
+    // win.webContents.openDevTools(); // 开发时可选开启
+  } else {
+    // 生产环境：直接加载构建后的静态文件
+    // 注意：由于 vite build 后 index.html 在 dist/ 下
+    win.loadFile(path.join(__dirname, 'dist/index.html'));
+  }
 }
 
 app.whenReady().then(() => {
