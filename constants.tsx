@@ -53,6 +53,7 @@ export const SEED_DATA: AppState = {
     "save_dc": 15,
     "stats": { "STR": 70, "DEX": 85, "CON": 75, "INT": 95, "WIS": 70, "CHA": 80 },
     "skill_proficiencies": { "INT_奥秘": true, "INT_调查": true, "WIS_察觉": true, "CHA_游说": true },
+    "saving_throw_proficiencies": { "STR": false, "DEX": true, "CON": false, "INT": true, "WIS": false, "CHA": false },
     "background": "在游历各地的旅途中，炼逐渐形成了独特的炼金体系。"
   },
   "equipment": {

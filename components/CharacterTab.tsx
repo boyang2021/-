@@ -44,6 +44,19 @@ const CharacterTab: React.FC<Props> = ({ state, dispatch, derived }) => {
     });
   };
 
+  const toggleSavingThrowProficiency = (s: StatKey) => {
+    const currentProfs = character.saving_throw_proficiencies || {};
+    dispatch({
+      type: 'UPDATE_CHARACTER',
+      payload: {
+        saving_throw_proficiencies: {
+          ...currentProfs,
+          [s]: !currentProfs[s]
+        }
+      }
+    });
+  };
+
   return (
     <div className="space-y-12">
       {/* Hero Identity Banner */}
@@ -117,10 +130,17 @@ const CharacterTab: React.FC<Props> = ({ state, dispatch, derived }) => {
             const total = derived.totalStats[s];
             const mod = getAbilityMod(total);
             const bonus = derived.equipmentBonus[s];
+            const isProficientSave = character.saving_throw_proficiencies?.[s] || false;
             
             return (
               <div key={s} className="bg-slate-900 rounded-[2.5rem] p-8 border border-white/5 flex flex-col items-center group relative hover:border-amber-500/40 transition-all hover:translate-y-[-4px] shadow-xl">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">{STAT_NAME_MAP[s]}</span>
+                <button 
+                  onClick={() => toggleSavingThrowProficiency(s)}
+                  title="点击切换熟练豁免"
+                  className={`text-sm font-black uppercase tracking-widest mb-4 transition-colors hover:scale-105 active:scale-95 ${isProficientSave ? 'text-purple-500' : 'text-slate-400'}`}
+                >
+                  {STAT_NAME_MAP[s]} ({s})
+                </button>
                 
                 <div className="bg-slate-950 w-20 h-20 rounded-[2rem] flex items-center justify-center border border-white/5 mb-6 group-hover:border-amber-500/20 transition-all">
                   <span className="text-4xl font-black text-white tabular-nums">{total}</span>
@@ -131,7 +151,7 @@ const CharacterTab: React.FC<Props> = ({ state, dispatch, derived }) => {
                 </div>
 
                 <div className="mt-6 flex items-center gap-2">
-                  <span className="text-[9px] font-black text-slate-600">BASE</span>
+                  <span className="text-[10px] font-black text-slate-700 uppercase tracking-tighter">Base</span>
                   <input 
                     type="number"
                     value={character.stats[s]}

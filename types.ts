@@ -84,6 +84,7 @@ export interface AppState {
     save_dc: number;
     stats: Record<StatKey, number>;
     skill_proficiencies: Record<string, boolean>;
+    saving_throw_proficiencies: Record<StatKey, boolean>;
     background: string;
   };
   equipment: {
